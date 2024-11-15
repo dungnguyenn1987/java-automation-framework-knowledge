@@ -1,3 +1,129 @@
+# Installation
+<details>
+	
+* Install Java JDK (version 1.8 or later https://www.oracle.com/vn/java/technologies/downloads/#java21)
+  * Set Environment variables:
+  	* `JAVA_HOME=C:\Program Files\Java\jdk-21\`
+   	* Add more Path `C:\Program Files\Java\jdk-21\bin`
+  * Check version: `java –version`
+* Download and extract Maven to any location (https://maven.apache.org/download.cgi)
+  * Set Environment variables:
+  	* `MAVEN_HOME=C:\Program Files\apache-maven-3.8.8`
+   	* Add more Path =C:\Program Files\apache-maven-3.8.8\bin`
+  * Check version: `mvn –version`
+* Install Editor
+  * Visual Studio Code with adding extensions
+    * Extension Pack for Java
+    * Cucumber (Gherkin) Full Support
+    * And The extension supports the following test frameworks:
+    	* JUnit 4 (v4.8.0+)
+    	* JUnit 5 (v5.1.0+)
+    	* TestNG (v6.9.13.3+)
+  * OR Intellij Community Editor with plugins
+	* Cucummber for Java
+	* Cucumber for Groovy
+  * OR Eclipse IDE
+
+</details>
+	
+# Project Setup
+<details>
+	
+* Initialize
+	* VSCode (https://code.visualstudio.com/docs/java/java-testing)
+
+![image](https://github.com/user-attachments/assets/ebab51da-1cb6-439d-ac47-3800d84b41ba)
+
+	* Intellij
+ 
+![image](https://github.com/user-attachments/assets/687de8c8-e495-4eb9-9fba-94038f00e900)
+
+* Add dependencies to pom.xml
+
+```java
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.example</groupId>
+  <artifactId>JavaAutoTests</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>JavaAutoTests</name>
+  <url>http://maven.apache.org</url>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.13.2</version>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <version>5.11.3</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.rest-assured</groupId>
+      <artifactId>rest-assured</artifactId>
+      <version>5.5.0</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-java</artifactId>
+      <version>7.20.1</version>
+    </dependency>
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-junit</artifactId>
+      <version>7.20.1</version>
+    </dependency>
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-picocontainer</artifactId>
+      <version>7.20.1</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>2.10.2</version>
+    </dependency>
+  </dependencies>
+</project>
+
+```
+ 
+</details>
+
+# How to run tests
+<details>
+
+* VSCode
+
+![image](https://github.com/user-attachments/assets/1d9eee01-ccc5-4218-aa85-51eca20d0083)
+
+* Intellij:
+
+![image](https://github.com/user-attachments/assets/52fb41e8-5e3e-4fc1-925f-8face21d6b18)
+
+</details>
+
+# UI Tests
+## Page Object Model (POM)
+* a design pattern or a framework that we use in Selenium using which one can create an object repository of the different web elements across the application. By this way, the code becomes easy to maintain and reduces code duplicity
+* In the Page Object Model framework, we create a class file for each web page. This class file consists of different web elements present on the web page
+* Test scripts then use these elements to perform different actions
+
+![image](https://github.com/user-attachments/assets/a921bc62-cac6-4144-9c63-827cab3fe7b6)
+
+
 # API Tests
 1. Create a Route class: contains URI and build full paths to server
 <details>
@@ -288,9 +414,10 @@ import apiEngine.model.responses.UserAccount;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
+import org.apache.http.HttpStatus;
 
 public class EndPoints {
-	
+
     private final RequestSpecification request;
 
     public EndPoints(String baseUrl) {
@@ -299,53 +426,30 @@ public class EndPoints {
         request.header("Content-Type", "application/json");
     }
 
-    public IRestResponse<Token> authenticateUser(AuthorizationRequest authRequest) {
-	RestAssured.baseURI = BASE_URL;
-        RequestSpecification request = RestAssured.given();
-
-        request.header("Content-Type", "application/json");
+    public void authenticateUser(AuthorizationRequest authRequest) {
         Response response = request.body(authRequest).post(Route.generateToken());
-        return new RestResponse(Token.class, response);
-	}
+        if (response.statusCode() != HttpStatus.SC_OK)
+            throw new RuntimeException("Authentication Failed. Content of failed Response: " + response.toString() + " , Status Code : " + response.statusCode());
+
+        Token tokenResponse = response.body().jsonPath().getObject("$", Token.class);
+        request.header("Authorization", "Bearer " + tokenResponse.token);
+    }
 
     public IRestResponse<Books> getBooks() {
-        RestAssured.baseURI = BASE_URL;
-        RequestSpecification request = RestAssured.given();
-
-        request.header("Content-Type", "application/json");
         Response response = request.get(Route.books());
         return new RestResponse(Books.class, response);
     }
 
-    public IRestResponse<UserAccount> addBook(AddBooksRequest addBooksRequest, String token) {
-        RestAssured.baseURI = BASE_URL;
-        RequestSpecification request = RestAssured.given();
-        request.header("Authorization", "Bearer " + token)
-                .header("Content-Type", "application/json");
-
+    public IRestResponse<UserAccount> addBook(AddBooksRequest addBooksRequest) {
         Response response = request.body(addBooksRequest).post(Route.books());
         return new RestResponse(UserAccount.class, response);
     }
 
-    public Response removeBook(RemoveBookRequest removeBookRequest, String token) {
-
-        RestAssured.baseURI = BASE_URL;
-        RequestSpecification request = RestAssured.given();
-
-        request.header("Authorization", "Bearer " + token)
-                .header("Content-Type", "application/json");
-
+    public Response removeBook(RemoveBookRequest removeBookRequest) {
         return request.body(removeBookRequest).delete(Route.book());
     }
 
-    public IRestResponse<UserAccount> getUserAccount(String userId, String token) {
-
-        RestAssured.baseURI = BASE_URL;
-        RequestSpecification request = RestAssured.given();
-
-        request.header("Authorization", "Bearer " + token)
-                .header("Content-Type", "application/json");
-
+    public IRestResponse<UserAccount> getUserAccount(String userId) {
         Response response = request.get(Route.userAccount(userId));
         return new RestResponse(UserAccount.class, response);
     }
@@ -363,79 +467,44 @@ public class EndPoints {
 <summary>Show scripts</summary>
 
 ```java
-package stepDefinitions;
-
-import apiEngine.EndPoints;
-import apiEngine.IRestResponse;
-import apiEngine.model.*;
-import apiEngine.model.requests.*;
-import apiEngine.model.responses.*;
-import org.junit.Assert;
-import cucumber.api.java.en.Given;
-import cucumber.api.java.en.Then;
-import cucumber.api.java.en.When;
-import io.restassured.response.Response;
-
-public class Steps {
-
-    private final String USER_ID = "9b5f49ab-eea9-45f4-9d66-bcf56a531b85";    
-    private Response response;
-    private IRestResponse<UserAccount> userAccountResponse;
-    private Book book;
-    private final String BaseUrl = "https://bookstore.toolsqa.com";
-    private EndPoints endPoints;
-    
-    @Given("^I am an authorized user$")
-    public void iAmAnAuthorizedUser() {
-    	endPoints = new EndPoints(BaseUrl);
-    	AuthorizationRequest authRequest = new AuthorizationRequest("TOOLSQA-Test", "Test@@123");
-    	endPoints.authenticateUser(authRequest);
-    }
-
-    @Given("^A list of books are available$")
-    public void listOfBooksAreAvailable() {   	    	
-    	IRestResponse<Books> booksResponse = endPoints.getBooks();
-    	book = booksResponse.getBody().books.get(0);
-    }
-
     @When("^I add a book to my reading list$")
     public void addBookInList() {
-    	
+
         ISBN isbn = new ISBN(book.isbn);
         AddBooksRequest addBooksRequest = new AddBooksRequest(USER_ID, isbn);
-        userAccountResponse = endPoints.addBook(addBooksRequest);
+        userAccountResponse = endPoints.addBook(addBooksRequest, tokenResponse.token);
     }
 
-    @Then("^The book is added$")
-    public void bookIsAdded() {
-        
-    	Assert.assertTrue(userAccountResponse.isSuccessful());
-        Assert.assertEquals(201, userAccountResponse.getStatusCode());
-
-        Assert.assertEquals(USER_ID, userAccountResponse.getBody().userID);
-        Assert.assertEquals(book.isbn, userAccountResponse.getBody().books.get(0).isbn);
-    }
-
-    @When("^I remove a book from my reading list$")
-    public void removeBookFromList() {
-
-        RemoveBookRequest removeBookRequest = new RemoveBookRequest(USER_ID, book.isbn);
-        response = endPoints.removeBook(removeBookRequest);
-    }
-
-    @Then("^The book is removed$")
-    public void bookIsRemoved() {
-    	
-        Assert.assertEquals(204, response.getStatusCode());
-
-        userAccountResponse = endPoints.getUserAccount(USER_ID);
-        Assert.assertEquals(200, userAccountResponse.getStatusCode());
-        
-        Assert.assertEquals(0, userAccountResponse.getBody().books.size());
-    }
-
-}
 ```
 
 </details>
 <br/>
+
+# Enhancements
+## Sharing Context between Cucumber Step Definitions
+* Dependency Injection (DI) Containers - it simply tells a DI container to instantiate your step definition classes and wire them up correctly. One of the supported DI containers is PicoContainer (need to add in pom.xml). Cucumber scans your classes with step definitions in them, passes them to PicoContainer, then asks it to create new instances for every scenario
+* Create a Test Context class that containts all information your Steps file are using
+ * PageObjects
+ * WebDriver
+ * BASE_URL
+ * endPoints
+
+```java
+package cucumber;
+
+import apiEngine.EndPoints;
+
+public class TestContext {
+	
+	private String BASE_URL = "https://bookstore.toolsqa.com";
+	private EndPoints endPoints;
+	
+	public TestContext() {
+		endPoints = new EndPoints(BASE_URL);
+	}
+	
+	 public EndPoints getEndPoints() {
+        return endPoints;
+    }
+}
+```
