@@ -122,20 +122,23 @@
 
 </details>
 
-# Components for UI Tests
+# Common Components
 ### 1. Read Configurations from Property File
 <details>
 .properties files are mainly used in Java programs to maintain project configuration data, api, database config or project settings, etc. Each parameter in properties file is stored as a pair of strings, in key-value pair format, where each key is on one line. You can easily read properties from some file using an object of type Properties. Using properties file is we can configure things that are prone to change over a period of time without need of changing anything in code.
 
 ```
 # Configuration.properties
-environment=local
+environment=qa
 browser=chrome
 windowMaximize=true
 driverPath=C:\\ToolsQA\\Libs\\Drivers\\chromedriver.exe
 implicitlyWait=20
-url=http://www.shop.demoqa.com
+url=http://www.demoqa.com
 testDataResourcePath=src/test/resources/testDataResources/
+
+baseUrl=https://bookstore.toolsqa.com
+userId=79617b93-711a-4b7d-a62f-9c7563a1b3d2
 ```
 
 ```java
@@ -236,14 +239,24 @@ public class ConfigFileReader {
         if(windowSize != null) return Boolean.valueOf(windowSize);
         return true;
     }
-	
-	public String getTestDataResourcePath(){
-		String testDataResourcePath = properties.getProperty("testDataResourcePath");
-		if(testDataResourcePath!= null) return testDataResourcePath;
-		else throw new RuntimeException("Test Data Resource Path not specified in the Configuration.properties file for the Key:testDataResourcePath");		
-	}
-}
 
+    public String getTestDataResourcePath(){
+        String testDataResourcePath = properties.getProperty("testDataResourcePath");
+        if(testDataResourcePath!= null) return testDataResourcePath;
+        else throw new RuntimeException("Test Data Resource Path not specified in the Configuration.properties file for the Key:testDataResourcePath");
+    }
+    public String getBaseUrl() {
+        String baseUrl = properties.getProperty("baseUrl");
+        if(baseUrl != null) return baseUrl;
+        else throw new RuntimeException("base_Url not specified in the Configuration.properties file.");
+    }
+
+    public String getUserID() {
+        String userId = properties.getProperty("userId");
+        if(userId != null) return userId;
+        else throw new RuntimeException("user_Id not specified in the Configuration.properties file.");
+    }
+}
 ```
 
 </details>
@@ -288,7 +301,150 @@ public class FileReaderManager {
 
 </details>
 
-### 3. Design WebDriver Manager
+### 3. Share Scenario Context in Cucumber
+<details>
+
+* Scenario Context in cucumber for sharing data between our Step Definitions. It holds the test data information explicitly, store values in a key-value pair between the steps. 
+
+```java
+package enums;
+
+public enum Context {
+    BOOK,
+    USER_ID,
+    USER_ACCOUNT_RESPONSE,
+    BOOK_REMOVE_RESPONSE,
+    PRODUCT_NAME;
+}
+
+```
+
+```java
+package cucumber;
+
+import enums.Context;
+import java.util.HashMap;
+import java.util.Map;
+
+public class ScenarioContext {
+
+    private Map<String, Object> scenarioContext;
+
+    public ScenarioContext(){
+        scenarioContext = new HashMap<String, Object>();
+    }
+
+    public void setContext(Context key, Object value) {
+        scenarioContext.put(key.toString(), value);
+    }
+
+    public Object getContext(Context key){
+        return scenarioContext.get(key.toString());
+    }
+
+    public Boolean isContains(Context key){
+        return scenarioContext.containsKey(key.toString());
+    }
+}
+```
+
+</details>
+
+### 4. Sharing Context between Cucumber Step Definitions
+<details>
+
+* Dependency Injection (DI) Containers - it simply tells a DI container to instantiate your step definition classes and wire them up correctly. One of the supported DI containers is PicoContainer (need to add PicoContainer in pom.xml). Cucumber scans your classes with step definitions in them, passes them to PicoContainer, then asks it to create new instances for every scenario
+* Create a Test Context class that containts all information your Steps file are using
+  	* PageObjectManager 
+  	* WebDriverManager 
+  	* scenarioContext
+  	* EndPoints
+
+```java
+package cucumber;
+
+import managers.FileReaderManager;
+import managers.PageObjectManager;
+import managers.WebDriverManager;
+import apiEngine.EndPoints;
+import enums.Context;
+
+public class TestContext {
+    private ScenarioContext scenarioContext;
+    private WebDriverManager webDriverManager;
+    private PageObjectManager pageObjectManager;
+    private EndPoints endPoints;
+
+    public TestContext() {
+        scenarioContext = new ScenarioContext();
+        webDriverManager = new WebDriverManager();
+        pageObjectManager = new PageObjectManager(webDriverManager.getDriver());
+        endPoints = new EndPoints(FileReaderManager.getInstance().getConfigReader().getBaseUrl());
+        scenarioContext.setContext(Context.USER_ID, FileReaderManager.getInstance().getConfigReader().getUserID());
+    }
+
+    public WebDriverManager getWebDriverManager() {
+        return webDriverManager;
+    }
+
+    public PageObjectManager getPageObjectManager() {
+        return pageObjectManager;
+    }
+
+    public EndPoints getEndPoints() {
+        return endPoints;
+    }
+    public ScenarioContext getScenarioContext() {
+        return scenarioContext;
+    }
+
+}
+```
+
+</details>
+
+### 5. Hooks
+<details>
+
+```java
+package stepDefinitions;
+
+import cucumber.TestContext;
+import io.cucumber.java.After;
+import io.cucumber.java.Before;
+
+public class Hooks {
+
+    TestContext testContext;
+
+    public Hooks(TestContext context) {
+        testContext = context;
+    }
+
+    @Before
+    public void BeforeSteps() {
+		/*What all you can perform here
+			Starting a webdriver
+			Setting up DB connections
+			Setting up test data
+			Setting up browser cookies
+			Navigating to certain page
+			or anything before the test
+		*/
+    }
+
+    @After
+    public void AfterSteps() {
+        testContext.getWebDriverManager().closeDriver();
+    }
+
+}
+```
+
+</details>
+
+# Components for UI Tests
+### 1. Design WebDriver Manager
 <details>
 Some called it as WebDriver Factory or Browser Factory. This is the way for handling the logic of creating WebDriver dynamically by configuration when you want to change the browser run
 
@@ -327,7 +483,8 @@ public class WebDriverManager {
                 System.setProperty(CHROME_DRIVER_PROPERTY, FileReaderManager.getInstance().getConfigReader().getDriverPath());
                 driver = new ChromeDriver();
                 break;
-            case IE : driver = new InternetExplorerDriver();
+            case IE :
+		driver = new InternetExplorerDriver();
                 break;
         }
 
@@ -347,7 +504,7 @@ public class WebDriverManager {
 
 </details>
 
-### 4. Create Page Objests
+### 2. Create Page Objests
 
 <details>
 To better manage the code and to improve the re-usability, this pattern suggests us to divided an application in different pages or a single page into sub pages in Page Object Pattern (POM)
@@ -381,6 +538,7 @@ public class HomePage {
 package pageObjects;
 
 import java.util.List;
+import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindAll;
@@ -389,24 +547,30 @@ import org.openqa.selenium.support.How;
 import org.openqa.selenium.support.PageFactory;
 
 public class ProductListingPage {
-	
-	public ProductListingPage(WebDriver driver) {
-		PageFactory.initElements(driver, this);
-	}
-	
-	@FindBy(how = How.CSS, using = "button.single_add_to_cart_button") 
-	private WebElement btn_AddToCart;
-	
-	@FindAll(@FindBy(how = How.CSS, using = ".noo-product-inner"))
-	private List<WebElement> prd_List;	
-	
-	public void clickOn_AddToCart() {
-		btn_AddToCart.click();
-	}
-	
-	public void select_Product(int productNumber) {
-		prd_List.get(productNumber).click();
-	}
+    WebDriver driver;
+
+    public ProductListingPage(WebDriver driver) {
+        this.driver = driver;
+        PageFactory.initElements(driver, this);
+    }
+
+    @FindBy(how = How.CSS, using = "button.single_add_to_cart_button")
+    private WebElement btn_AddToCart;
+
+    @FindAll(@FindBy(how = How.CSS, using = ".noo-product-inner"))
+    private List<WebElement> prd_List;
+
+    public void clickOn_AddToCart() {
+        btn_AddToCart.click();
+    }
+
+    public void select_Product(int productNumber) {
+        prd_List.get(productNumber).click();
+    }
+
+    public String getProductName(int productNumber) {
+        return prd_List.get(productNumber).findElement(By.cssSelector("h3")).getText();
+    }
 
 }
 ```
@@ -614,7 +778,7 @@ public class CheckoutPage {
 
 </details>
 
-### 5. Create Page Object Manager
+### 3. Create Page Object Manager
 
 <details>
 In the case of multiple-step definition files, we will be creating an object of Pages again and again and make code duplication. To avoid this situation, we can create a Page Object Manager. The duty of the Page Object Manager is to create the page's object and also to make sure that the same object should not be created again and again. But to use a single object for all the step definition files.
@@ -1006,107 +1170,33 @@ public class EndPoints {
 ```
 
 </details>
-<br/>
-
-# Sharing Context between Cucumber Step Definitions
-<details>
-
-* Dependency Injection (DI) Containers - it simply tells a DI container to instantiate your step definition classes and wire them up correctly. One of the supported DI containers is PicoContainer (need to add PicoContainer in pom.xml). Cucumber scans your classes with step definitions in them, passes them to PicoContainer, then asks it to create new instances for every scenario
-* Create a Test Context class that containts all information your Steps file are using
-  	* PageObjectManager 
-  	* WebDriverManager 
-  	* BASE_URL
-  	* EndPoints
-
-```java
-package cucumber;
-
-import managers.PageObjectManager;
-import managers.WebDriverManager;
-import apiEngine.EndPoints;
-
-public class TestContext {
-	private WebDriverManager webDriverManager;
-	private PageObjectManager pageObjectManager;
-	private String BASE_URL = "https://bookstore.toolsqa.com";
-	private EndPoints endPoints;
-	
-	public TestContext() {
-		webDriverManager = new WebDriverManager();
-		pageObjectManager = new PageObjectManager(webDriverManager.getDriver());
-		endPoints = new EndPoints(BASE_URL);
-	}
-
-	public WebDriverManager getWebDriverManager() {
-		return webDriverManager;
-	}
-	
-	public PageObjectManager getPageObjectManager() {
-		return pageObjectManager;
-	}
-
-	 public EndPoints getEndPoints() {
-	        return endPoints;
-	 }
-}
-```
-
-</details>
-
-# Hooks
-<details>
-
-* Dependency Injection (DI) Containers - it simply tells a DI container to instantiate your step definition classes and wire them up correctly. One of the supported DI containers is PicoContainer (need to add PicoContainer in pom.xml). Cucumber scans your classes with step definitions in them, passes them to PicoContainer, then asks it to create new instances for every scenario
-* Create a Test Context class that containts all information your Steps file are using
-  	* PageObjectManager 
-  	* WebDriverManager 
-  	* BASE_URL
-  	* EndPoints
-
-```java
-package stepDefinitions;
-
-import cucumber.TestContext;
-import io.cucumber.java.After;
-import io.cucumber.java.Before;
-
-public class Hooks {
-
-    TestContext testContext;
-
-    public Hooks(TestContext context) {
-        testContext = context;
-    }
-
-    @Before
-    public void BeforeSteps() {
-		/*What all you can perform here
-			Starting a webdriver
-			Setting up DB connections
-			Setting up test data
-			Setting up browser cookies
-			Navigating to certain page
-			or anything before the test
-		*/
-    }
-
-    @After
-    public void AfterSteps() {
-        testContext.getWebDriverManager().closeDriver();
-    }
-
-}
-```
-
-</details>
 
 # Features
 <details>
-
+<summary>UI</summary>
+	
  ```java
+Feature: Automated End2End Tests
+  Description: The purpose of this feature is to test End 2 End integration.
 
+  Scenario Outline: Customer place an order by purchasing an item from search
+    Given user is on Home Page
+    When he search for "dress"
+    And choose to buy the first item
+    And moves to checkout from mini cart
+    And enter "<customer>" personal details on checkout page
+    And select same delivery address
+    And select payment method as "check" payment
+    And place the order
+    Examples:
+      |customer|
+      |Lakshay|
 ```
+</details>
 
+<details>
+<summary>API</summary>
+	
  ```java
 Feature: Book Application API
   Background: User generates token for Authorisation
@@ -1121,9 +1211,171 @@ Feature: Book Application API
 </details>
 
 # Step Definitions
+
+<details>
+<summary>UI</summary>
+
+ ```java
+package stepDefinitions;
+
+import cucumber.TestContext;
+import io.cucumber.java.en.Given;
+import io.cucumber.java.en.When;
+import pageObjects.HomePage;
+
+public class HomePageSteps {
+
+    TestContext testContext;
+    HomePage homePage;
+
+    public HomePageSteps(TestContext context) {
+        testContext = context;
+        homePage = testContext.getPageObjectManager().getHomePage();
+    }
+
+    @Given("^user is on Home Page$")
+    public void user_is_on_Home_Page(){
+        homePage.navigateTo_HomePage();
+    }
+
+    @When("^he search for \"([^\"]*)\"$")
+    public void he_search_for(String product)  {
+        homePage.perform_Search(product);
+    }
+
+}
+```
+
+ ```java
+package stepDefinitions;
+
+import cucumber.TestContext;
+import io.cucumber.java.en.When;
+import enums.Context;
+import pageObjects.ProductListingPage;
+
+public class ProductPageSteps {
+
+    TestContext testContext;
+    ProductListingPage productListingPage;
+
+    public ProductPageSteps(TestContext context) {
+        testContext = context;
+        productListingPage = testContext.getPageObjectManager().getProductListingPage();
+    }
+
+    @When("^choose to buy the first item$")
+    public void choose_to_buy_the_first_item() {
+        String productName = productListingPage.getProductName(0);
+        testContext.scenarioContext.setContext(Context.PRODUCT_NAME, productName);
+
+        productListingPage.select_Product(0);
+        productListingPage.clickOn_AddToCart();
+    }
+}
+```
+
+ ```java
+package stepDefinitions;
+
+import cucumber.TestContext;
+import io.cucumber.java.en.When;
+import pageObjects.CartPage;
+
+public class CartPageSteps {
+
+    TestContext testContext;
+    CartPage cartPage;
+
+    public CartPageSteps(TestContext context) {
+        testContext = context;
+        cartPage = testContext.getPageObjectManager().getCartPage();
+    }
+
+    @When("^moves to checkout from mini cart$")
+    public void moves_to_checkout_from_mini_cart(){
+        cartPage.clickOn_Cart();
+        cartPage.clickOn_ContinueToCheckout();
+    }
+
+}
+```
+
+```java
+package stepDefinitions;
+
+import cucumber.TestContext;
+import io.cucumber.java.en.When;
+import managers.FileReaderManager;
+import pageObjects.CheckoutPage;
+import testDataTypes.Customer;
+
+public class CheckoutPageSteps {
+    TestContext testContext;
+    CheckoutPage checkoutPage;
+
+    public CheckoutPageSteps(TestContext context) {
+        testContext = context;
+        checkoutPage = testContext.getPageObjectManager().getCheckoutPage();
+    }
+
+    @When("^enter \\\"(.*)\\\" personal details on checkout page$")
+    public void enter_personal_details_on_checkout_page(String customerName){
+        Customer customer = FileReaderManager.getInstance().getJsonReader().getCustomerByName(customerName);
+        checkoutPage.fill_PersonalDetails(customer);
+    }
+
+    @When("^select same delivery address$")
+    public void select_same_delivery_address(){
+        checkoutPage.check_ShipToDifferentAddress(false);
+    }
+
+    @When("^select payment method as \"([^\"]*)\" payment$")
+    public void select_payment_method_as_payment(String arg1){
+        checkoutPage.select_PaymentMethod("CheckPayment");
+    }
+
+    @When("^place the order$")
+    public void place_the_order() {
+        checkoutPage.check_TermsAndCondition(true);
+        checkoutPage.clickOn_PlaceOrder();
+    }
+
+}
+```
+
+</details>
+
 <details>
 <summary>API</summary>
-	
+
+ ```java
+package stepDefinitions;
+
+import apiEngine.EndPoints;
+import cucumber.ScenarioContext;
+import cucumber.TestContext;
+
+public class BaseSteps {
+
+    private EndPoints endPoints;
+    private ScenarioContext scenarioContext;
+
+    public BaseSteps(TestContext testContext) {
+        endPoints = testContext.getEndPoints();
+        scenarioContext = testContext.getScenarioContext();
+    }
+
+    public EndPoints getEndPoints() {
+        return endPoints;
+    }
+
+    public ScenarioContext getScenarioContext() {
+        return scenarioContext;
+    }
+}
+```
+
  ```java
 package stepDefinitions;
 
