@@ -1094,7 +1094,9 @@ public class RestResponse<T> implements IRestResponse<T> {
 ### 5. Create API Services
 
 <details>
+	
 We abstract the logic of communication with the server into a separate class. The class will contain methods that take the required request parameters and send back a response received from the server. Each method correspond to each API call that defined in your appication (e.g: generateToken, getUser, addBook...)
+
 ```java
 package apiEngine;
 
