@@ -301,7 +301,7 @@ public class FileReaderManager {
 
 </details>
 
-### 3. Share Scenario Context in Cucumber
+### 3. Share data between Cucumber Step Definitions
 <details>
 
 * Scenario Context in cucumber for sharing data between our Step Definitions. It holds the test data information explicitly, store values in a key-value pair between the steps. 
@@ -350,10 +350,32 @@ public class ScenarioContext {
 
 </details>
 
-### 4. Sharing Context between Cucumber Step Definitions
+### 4. Sharing Sate between Cucumber Step Definitions
 <details>
 
-* Dependency Injection (DI) Containers - it simply tells a DI container to instantiate your step definition classes and wire them up correctly. One of the supported DI containers is PicoContainer (need to add PicoContainer in pom.xml). Cucumber scans your classes with step definitions in them, passes them to PicoContainer, then asks it to create new instances for every scenario
+Refer https://www.thinkcode.se/blog/2017/04/01/sharing-state-between-steps-in-cucumberjvm-using-picocontainer
+
+**Sharing state between scenarios**
+
+Scenarios must be independent of one other so it is important that state is NOT shared between scenarios. Accidentally leaking state (Rò rỉ trạng thái) from one scenario into others makes your scenarios brittle and also difficult to run in isolation.
+
+To prevent accidentally leaking state between scenarios:
+
+- Avoid using global or static variables. It is unfortunately very easy for information to leak from one scenario to another. Static fields are not cleared while the JVM is running. To clear them, you would either have to reset them manually or restart the JVM. Both ways are cumbersome.
+- Make sure you clean your database in a Before hook.
+- If you share a browser between scenarios, delete cookies in a Before hook.
+
+**Sharing state between steps**
+
+A scenario in Gherkin is created by steps. Each step depends on previous steps. This means that we must be able to share state between steps. If You have added a bunch of scenarios to your project and finding your way around in the step definition class (1 class) is getting harder and harder. The problem with large classes are that they
+
+- are not coherent, they are about a lot of different things at the same time
+- don't follow the single responsibility principle, there are probably many reasons why a class has to be changed
+- are messy, it is hard to find what you need
+
+One way to split the steps may be according to the domain concept they work on. The next problem you will have to solve is to handle a shared state between the steps. The solution is to inject a common object in each class with steps An object that is recreated every time a new scenario is executed. Each scenario has a fresh world and leakage between scenarios through the world object is unlikely. Dependency injection can be done in many ways. A simple solution is to to inject dependencies through the constructor. This is sometimes referred to as Constructor Dependency Injection, CDI.
+	
+**Dependency Injection (DI) Containers** - it simply tells a DI container to instantiate your step definition classes and wire them up correctly. One of the supported DI containers is PicoContainer (need to add PicoContainer in pom.xml). Cucumber scans your classes with step definitions in them, passes them to PicoContainer, then asks it to create new instances for every scenario
 * Create a Test Context class that containts all information your Steps file are using
   	* PageObjectManager 
   	* WebDriverManager 
@@ -404,7 +426,10 @@ public class TestContext {
 </details>
 
 ### 5. Hooks
+
 <details>
+	
+Hooks are blocks of code that can run at various points in the Cucumber execution cycle. They are typically used for setup and teardown of the environment before and after each scenario.
 
 ```java
 package stepDefinitions;
@@ -438,6 +463,27 @@ public class Hooks {
         testContext.getWebDriverManager().closeDriver();
     }
 
+}
+```
+
+</details>
+
+### 6. Runner
+
+<details>
+	
+A runner class that will connect the specification in Gherkin with the steps implemented in Java. The runner class can be called anything but the Maven test runner searches the class path for classes that starts or ends with the word test. I prefer classes that ends with the word test. This means that naming it RunCukesTest will allow the test runner to find it and execute it as a part of the regular Maven build. It will be executed during the test phase.
+
+This executable specification will be executed when you do `mvn test`
+
+```java
+package runners;
+
+import cucumber.api.junit.Cucumber;
+import org.junit.runner.RunWith;
+
+@RunWith(Cucumber.class)
+public class RunCukesTest {
 }
 ```
 
@@ -867,7 +913,7 @@ public class Route {
 
 <details>
 	
-* Serialization of convert JSON request body to JAVA Object
+* serialize object to JSON and send it with the request.
 * POJO (plain old Java object) is an ordinary Java object, not bound by any special restriction
 * Use https://www.jsonschema2pojo.org/ to generate POJO
 
