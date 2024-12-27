@@ -483,6 +483,16 @@ import cucumber.api.junit.Cucumber;
 import org.junit.runner.RunWith;
 
 @RunWith(Cucumber.class)
+@CucumberOptions(
+        features = "src/test/resources/features",
+        glue = "stepDefinitions",
+        tags = "@regression and (not @wip) and (not @production)",
+        plugin = {
+                "pretty",
+                "json:target/cucumber-reports/cukesjson.json",
+                "rerun:target/cucumber-reports/failed_scenarios.txt"
+        }
+)
 public class RunCukesTest {
 }
 ```
