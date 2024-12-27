@@ -474,7 +474,7 @@ public class Hooks {
 	
 A runner class that will connect the specification in Gherkin with the steps implemented in Java. The runner class can be called anything but the Maven test runner searches the class path for classes that starts or ends with the word test. I prefer classes that ends with the word test. This means that naming it RunCukesTest will allow the test runner to find it and execute it as a part of the regular Maven build. It will be executed during the test phase.
 
-This executable specification will be executed when you do `mvn test`
+This executable specification will be executed when you do `mvn test`. This will execute all scenarios in same package as the runner, by default glue code is also assumed to be in the same package.
 
 ```java
 package runners;
