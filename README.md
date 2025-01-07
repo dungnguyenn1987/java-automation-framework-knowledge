@@ -563,7 +563,22 @@ public class WebDriverManager {
 ### 2. Create Page Objests
 
 <details>
-To better manage the code and to improve the re-usability, this pattern suggests us to divided an application in different pages or a single page into sub pages in Page Object Pattern (POM)
+To better manage the code and to improve the re-usability, this pattern suggests us to divided an application in different pages or a single page into sub pages in Page Object Pattern (POM).
+
+We have two main cases to apply a waiting strategy in the Page Objects: in the class constructor or the action methods. we only use either Explicitly or Fluent Waits when necessary. Not for any action, we create!
+
+Use the AjaxElementLocatorFactory class adds a lazy load approach in the PageFactory.initiElements to apply an automatic explicit wait. The usage of this class will reduce the necessity of explicitly waiting for elements in most cases. Instead of adding wait strategy to each Page Object contructor, we can create an abstract class to handle this job.
+
+```java
+public abstract class AbstractPageObject {
+ 
+    private WebDriver driver;
+     
+    protected AbstractPageObject(WebDriver driver) {
+        PageFactory.initElements(new AjaxElementLocatorFactory(driver, 5), this);
+    }
+}
+```
 
 ```java
 package pageObjects;
@@ -571,12 +586,11 @@ package pageObjects;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.PageFactory;
 
-public class HomePage {
+public class HomePage extends AbstractPageObject {
 	WebDriver driver;
 	
 	public HomePage(WebDriver driver) {
-		this.driver = driver;
-		PageFactory.initElements(driver, this);
+		super(driver);
 	}
 	
 	public void perform_Search(String search) {
@@ -923,9 +937,9 @@ public class Route {
 
 <details>
 	
-* serialize object to JSON and send it with the request.
-* POJO (plain old Java object) is an ordinary Java object, not bound by any special restriction
-* Use https://www.jsonschema2pojo.org/ to generate POJO
+- serialize object to JSON and send it with the request.
+- POJO (plain old Java object) is an ordinary Java object, not bound by any special restriction
+- Use https://www.jsonschema2pojo.org/ to generate POJO
 
 ![image](https://github.com/user-attachments/assets/aa9d1044-c3e0-4856-ad12-1e547a0bcfdd)
 
@@ -995,8 +1009,8 @@ public class ISBN {
 ### 3. Create a POJO class for a Response Body
 
 <details>
-* DeSerialization of convert JSON response body to JAVA Object
-* Purpose
+- DeSerialization of convert JSON response body to JAVA Object
+- Purpose
 
 Change to Deserializing the Response body (in `Endpoint` class) to access specific info from jsonPath into JAVA Object
 
